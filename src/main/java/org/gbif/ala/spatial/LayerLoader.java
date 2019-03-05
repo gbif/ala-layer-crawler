@@ -44,6 +44,7 @@ import java.nio.channels.FileChannel;
 import java.nio.channels.ReadableByteChannel;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -63,7 +64,7 @@ public class LayerLoader {
 
   public static void main(String[] args) throws IOException {
 
-    final SaltedKeyGenerator keyGenerator = new SaltedKeyGenerator(10);
+    final SaltedKeyGenerator keyGenerator = new SaltedKeyGenerator(20);
 
     Configuration configuration = HBaseConfiguration.create();
     configuration.set("hbase.zookeeper.quorum",
@@ -73,8 +74,9 @@ public class LayerLoader {
         Connection connection = ConnectionFactory.createConnection(configuration);
         Table table = connection.getTable(TableName.valueOf("australia_kv"))
     ) {
+      int c=1;
       for (File source : Paths.get("/Users/tsj442/dev/au/csv").toFile().listFiles()) {
-        System.out.println(source);
+        System.out.println(c++ + ": " + source);
 
         try (
             InputStream is = new FileInputStream(source);
@@ -85,6 +87,7 @@ public class LayerLoader {
 
           List<String> header = csvReader.read();
           List<String> row;
+          List<Put> data = new ArrayList<>();
           while ((row = csvReader.read()) != null) {
 
             LatLng key = new LatLng(Double.parseDouble(row.get(0)), Double.parseDouble(row.get(1)));
@@ -100,12 +103,14 @@ public class LayerLoader {
             Put put = new Put(keyGenerator.computeKey(key.getLogicalKey()))
                 .addColumn(Bytes.toBytes("v"), Bytes.toBytes("json"), Bytes.toBytes(payload));
 
-            table.put(put);
+            data.add(put);
+
 
             if (row.size() != 533) {
               System.out.println(row.get(0) + " has unexpected size: " + row.size());
             }
           }
+          table.put(data);
         }
       }
     }
